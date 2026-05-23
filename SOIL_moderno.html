@@ -500,6 +500,138 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }
     .tc-applied { animation: tc-flash 1.2s ease-out; }
 
+    /* ===== Catálogo de CN (modal) ===== */
+    .cn-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(26, 35, 50, 0.65);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .cn-modal-overlay.open { display: flex; }
+    .cn-modal-content {
+      background: white;
+      border-radius: 8px;
+      max-width: 940px;
+      width: 100%;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    .cn-modal-header {
+      padding: 16px 24px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .cn-modal-header h3 {
+      margin: 0;
+      font-size: 15px;
+      color: #2c5282;
+      border-bottom: none;
+      padding-bottom: 0;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .cn-modal-close {
+      background: none;
+      border: none;
+      font-size: 26px;
+      line-height: 1;
+      cursor: pointer;
+      color: #718096;
+      padding: 0 4px;
+    }
+    .cn-modal-close:hover { color: #1a2332; }
+    .cn-modal-help {
+      padding: 12px 24px;
+      background: #ebf4ff;
+      font-size: 12px;
+      color: #2c5282;
+      border-bottom: 1px solid #bee3f8;
+      line-height: 1.5;
+    }
+    .cn-modal-body {
+      flex: 1;
+      overflow: auto;
+    }
+    .cn-catalog-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .cn-catalog-table thead th {
+      background: #edf2f7;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      text-align: left;
+      padding: 10px 14px;
+      font-size: 11px;
+      color: #4a5568;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      border-bottom: 2px solid #cbd5e0;
+    }
+    .cn-catalog-table thead th.cn-group-col {
+      width: 64px;
+      text-align: center;
+      cursor: help;
+    }
+    .cn-catalog-table td {
+      padding: 9px 14px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+    }
+    .cn-catalog-group-header td {
+      background: #f7fafc;
+      font-weight: 600;
+      color: #2c5282;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.4px;
+      padding: 9px 14px;
+      border-bottom: 1px solid #cbd5e0;
+      border-top: 1px solid #cbd5e0;
+    }
+    .cn-row-name {
+      font-weight: 500;
+      color: #1a2332;
+    }
+    .cn-row-condition {
+      font-size: 11px;
+      color: #718096;
+      margin-top: 2px;
+    }
+    .cn-pick {
+      text-align: center;
+      cursor: pointer;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      color: #2c5282;
+      transition: background 0.1s, color 0.1s;
+      user-select: none;
+    }
+    .cn-pick:hover {
+      background: #2c5282;
+      color: white;
+    }
+    .cn-modal-footer {
+      padding: 12px 24px;
+      border-top: 1px solid #e2e8f0;
+      background: #f7fafc;
+      font-size: 11px;
+      color: #718096;
+      line-height: 1.5;
+    }
+    .cn-modal-footer em { font-style: italic; }
+
     /* ===== Estilos para impresión / Guardar como PDF ===== */
     @media print {
       @page { margin: 1.5cm; size: letter; }
@@ -542,7 +674,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       button.primary,
       .actions,
       #errorBox,
-      .dll-preview {
+      .dll-preview,
+      .cn-modal-overlay {
         display: none !important;
       }
 
@@ -635,7 +768,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
             </select>
           </div>
         </label>
-        <label>CN (número de escurrimiento) <input type="number" id="cn" step="any" placeholder="Ej: 75"></label>
+        <label>CN (número de escurrimiento)
+          <input type="number" id="cn" step="any" placeholder="Ej: 75">
+          <button type="button" class="tc-toggle-btn" id="openCnCatalog">📖 Elegir CN desde catálogo de uso del suelo</button>
+        </label>
         <label>Tiempo de concentración (hrs)
           <input type="number" id="tc" step="any" placeholder="Ej: 1.2">
           <button type="button" class="tc-toggle-btn" id="toggleTcCalc">▼ Calcular Tc desde parámetros físicos</button>
@@ -701,6 +837,44 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       </div>
     </section>
   </main>
+
+  <div id="cnCatalogModal" class="cn-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cnCatalogTitle">
+    <div class="cn-modal-content">
+      <div class="cn-modal-header">
+        <h3 id="cnCatalogTitle">Catálogo de Número de Escurrimiento (CN)</h3>
+        <button type="button" class="cn-modal-close" id="cnCatalogClose" title="Cerrar" aria-label="Cerrar">×</button>
+      </div>
+      <div class="cn-modal-help">
+        Pulsa el valor de CN en la columna que corresponda al <strong>grupo hidrológico</strong>
+        del suelo de tu cuenca. El valor se copiará al campo del formulario.
+        <br>
+        <strong>A</strong>: arenosos profundos, drenaje muy alto · <strong>B</strong>: arenas
+        finas y limos, drenaje moderado · <strong>C</strong>: arcillosos limosos, drenaje lento ·
+        <strong>D</strong>: arcillas pesadas, drenaje muy lento.
+      </div>
+      <div class="cn-modal-body">
+        <table class="cn-catalog-table">
+          <thead>
+            <tr>
+              <th>Uso del suelo y condición</th>
+              <th class="cn-group-col" title="Grupo A: arenosos profundos, drenaje muy alto">A</th>
+              <th class="cn-group-col" title="Grupo B: arenas finas y limos, drenaje moderado">B</th>
+              <th class="cn-group-col" title="Grupo C: arcillosos limosos, drenaje lento">C</th>
+              <th class="cn-group-col" title="Grupo D: arcillas pesadas, drenaje muy lento">D</th>
+            </tr>
+          </thead>
+          <tbody id="cnCatalogBody"></tbody>
+        </table>
+      </div>
+      <div class="cn-modal-footer">
+        Valores estándar de <strong>NRCS TR-55</strong> (USDA, 1986), Tablas 2-2a, 2-2c y 2-2d.
+        Reproducidos en <em>INVÍAS — Manual de Drenaje para Carreteras</em> (2009) y
+        en Aparicio Mijares, <em>Fundamentos de Hidrología de Superficie</em>.
+        Aplican para condición de humedad antecedente <strong>AMC II</strong> (promedio); ajusta
+        manualmente a AMC I (seco) o AMC III (saturado) si tu evento de diseño lo requiere.
+      </div>
+    </div>
+  </div>
 
   <script>
     // =====================================================================
@@ -1193,6 +1367,127 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     }
 
     // =====================================================================
+    // CATÁLOGO DE NÚMERO DE ESCURRIMIENTO (CN)
+    // -----
+    // Valores tomados de NRCS TR-55 (USDA, 1986), Tablas 2-2a (urbano),
+    // 2-2c (agrícola cultivada) y 2-2d (otros agrícolas). Mismos valores
+    // reproducidos en INVÍAS Manual de Drenaje para Carreteras (2009) y
+    // en Aparicio Mijares "Fundamentos de Hidrología de Superficie".
+    // Aplican para condición de humedad antecedente AMC II.
+    // =====================================================================
+    const CN_CATALOG = [
+      // --- Cultivos agrícolas ---
+      { group: "Cultivos agrícolas", name: "Cultivos en hilera (caña de azúcar, maíz, soya, banano, algodón)", condition: "Hilera recta, sin prácticas de conservación, condición pobre", values: [72, 81, 88, 91] },
+      { group: "Cultivos agrícolas", name: "Cultivos en hilera (caña de azúcar, maíz, soya, banano, algodón)", condition: "Hilera recta, condición buena", values: [67, 78, 85, 89] },
+      { group: "Cultivos agrícolas", name: "Cultivos en hilera, en contorno y terrazas", condition: "Con prácticas de conservación, condición buena", values: [62, 71, 78, 81] },
+      { group: "Cultivos agrícolas", name: "Granos pequeños (trigo, avena, cebada)", condition: "Hilera recta, condición regular", values: [63, 75, 83, 87] },
+      { group: "Cultivos agrícolas", name: "Leguminosas de siembra densa o pradera en rotación", condition: "Hilera recta, condición buena", values: [58, 72, 81, 85] },
+
+      // --- Pastizales y vegetación natural ---
+      { group: "Pastizales y vegetación natural", name: "Pasto natural o de pastoreo", condition: "Pobre — cobertura < 50 %, pastoreo intenso", values: [68, 79, 86, 89] },
+      { group: "Pastizales y vegetación natural", name: "Pasto natural o de pastoreo", condition: "Regular — cobertura 50 % a 75 %", values: [49, 69, 79, 84] },
+      { group: "Pastizales y vegetación natural", name: "Pasto natural o de pastoreo", condition: "Buena — cobertura > 75 %, pastoreo ligero", values: [39, 61, 74, 80] },
+      { group: "Pastizales y vegetación natural", name: "Vega o pradera permanente", condition: "Protegida del pastoreo, cobertura continua", values: [30, 58, 71, 78] },
+      { group: "Pastizales y vegetación natural", name: "Matorral o rastrojo (matorral con pasto y maleza)", condition: "Pobre — cobertura escasa", values: [48, 67, 77, 83] },
+      { group: "Pastizales y vegetación natural", name: "Matorral o rastrojo (matorral con pasto y maleza)", condition: "Buena — cobertura densa", values: [30, 48, 65, 73] },
+
+      // --- Bosques ---
+      { group: "Bosques", name: "Bosque", condition: "Cubierta pobre — sotobosque ralo, suelo expuesto", values: [45, 66, 77, 83] },
+      { group: "Bosques", name: "Bosque", condition: "Cubierta regular", values: [36, 60, 73, 79] },
+      { group: "Bosques", name: "Bosque", condition: "Cubierta buena — sotobosque denso, hojarasca abundante", values: [30, 55, 70, 77] },
+      { group: "Bosques", name: "Combinación bosque-pasto (huerto, sistema agroforestal, café con sombrío)", condition: "Cubierta regular", values: [43, 65, 76, 82] },
+      { group: "Bosques", name: "Combinación bosque-pasto (huerto, sistema agroforestal, café con sombrío)", condition: "Cubierta buena", values: [32, 58, 72, 79] },
+
+      // --- Espacios abiertos urbanos ---
+      { group: "Espacios abiertos urbanos", name: "Parques, campos de golf, cementerios, jardines", condition: "Cobertura buena de pasto (> 75 %)", values: [39, 61, 74, 80] },
+      { group: "Espacios abiertos urbanos", name: "Parques, campos de golf, cementerios, jardines", condition: "Cobertura regular (50 % a 75 %)", values: [49, 69, 79, 84] },
+      { group: "Espacios abiertos urbanos", name: "Parques, campos de golf, cementerios, jardines", condition: "Cobertura pobre (< 50 %)", values: [68, 79, 86, 89] },
+
+      // --- Áreas residenciales ---
+      { group: "Áreas residenciales (por tamaño de lote)", name: "Lotes < 500 m² (≈ 65 % impermeable)", condition: "Vivienda densa", values: [77, 85, 90, 92] },
+      { group: "Áreas residenciales (por tamaño de lote)", name: "Lotes ≈ 1 000 m² (≈ 38 % impermeable)", condition: "Vivienda media", values: [61, 75, 83, 87] },
+      { group: "Áreas residenciales (por tamaño de lote)", name: "Lotes ≈ 1 300 m² (≈ 30 % impermeable)", condition: "Vivienda media-dispersa", values: [57, 72, 81, 86] },
+      { group: "Áreas residenciales (por tamaño de lote)", name: "Lotes ≈ 2 000 m² (≈ 25 % impermeable)", condition: "Vivienda dispersa", values: [54, 70, 80, 85] },
+      { group: "Áreas residenciales (por tamaño de lote)", name: "Lotes ≈ 4 000 m² (≈ 20 % impermeable)", condition: "Vivienda dispersa amplia", values: [51, 68, 79, 84] },
+      { group: "Áreas residenciales (por tamaño de lote)", name: "Lotes ≈ 8 000 m² (≈ 12 % impermeable)", condition: "Vivienda rural", values: [46, 65, 77, 82] },
+
+      // --- Áreas comerciales e industriales ---
+      { group: "Áreas comerciales e industriales", name: "Comercial y de negocios", condition: "≈ 85 % impermeable", values: [89, 92, 94, 95] },
+      { group: "Áreas comerciales e industriales", name: "Distritos industriales", condition: "≈ 72 % impermeable", values: [81, 88, 91, 93] },
+
+      // --- Superficies pavimentadas / otras ---
+      { group: "Superficies pavimentadas y otras", name: "Calles y carreteras pavimentadas, con cunetas y alcantarillado", condition: "Drenaje cerrado, totalmente impermeable", values: [98, 98, 98, 98] },
+      { group: "Superficies pavimentadas y otras", name: "Calles pavimentadas con cunetas abiertas", condition: "Drenaje superficial", values: [83, 89, 92, 93] },
+      { group: "Superficies pavimentadas y otras", name: "Calles de grava (afirmadas)", condition: "", values: [76, 85, 89, 91] },
+      { group: "Superficies pavimentadas y otras", name: "Calles destapadas (de tierra)", condition: "", values: [72, 82, 87, 89] },
+      { group: "Superficies pavimentadas y otras", name: "Techos, parqueaderos y plazas pavimentadas", condition: "Totalmente impermeable", values: [98, 98, 98, 98] },
+      { group: "Superficies pavimentadas y otras", name: "Áreas en desarrollo (movimiento de tierra reciente)", condition: "Sin vegetación establecida", values: [77, 86, 91, 94] },
+    ];
+
+    function buildCnCatalogHtml() {
+      let html = "";
+      let lastGroup = null;
+      for (const row of CN_CATALOG) {
+        if (row.group !== lastGroup) {
+          html += `<tr class="cn-catalog-group-header"><td colspan="5">${row.group}</td></tr>`;
+          lastGroup = row.group;
+        }
+        const condition = row.condition
+          ? `<div class="cn-row-condition">${row.condition}</div>`
+          : "";
+        const cells = row.values.map((v, i) => {
+          const g = ["A", "B", "C", "D"][i];
+          const title = `CN = ${v} — ${row.name} — Grupo hidrológico ${g}`;
+          return `<td class="cn-pick" data-cn="${v}" title="${title.replace(/"/g, "&quot;")}">${v}</td>`;
+        }).join("");
+        html += `
+          <tr class="cn-catalog-row">
+            <td>
+              <div class="cn-row-name">${row.name}</div>
+              ${condition}
+            </td>
+            ${cells}
+          </tr>
+        `;
+      }
+      return html;
+    }
+
+    function applyCnValue(cn) {
+      const cnInput = document.getElementById("cn");
+      cnInput.value = cn;
+      // Reutilizamos la animación tc-flash para feedback visual
+      cnInput.classList.remove("tc-applied");
+      void cnInput.offsetWidth;
+      cnInput.classList.add("tc-applied");
+    }
+
+    function openCnCatalog() {
+      const overlay = document.getElementById("cnCatalogModal");
+      const tbody = document.getElementById("cnCatalogBody");
+      if (tbody.children.length === 0) {
+        tbody.innerHTML = buildCnCatalogHtml();
+        tbody.querySelectorAll(".cn-pick").forEach(cell => {
+          cell.addEventListener("click", () => {
+            applyCnValue(parseFloat(cell.dataset.cn));
+            closeCnCatalog();
+          });
+        });
+      }
+      overlay.classList.add("open");
+      document.addEventListener("keydown", handleCnCatalogEsc);
+    }
+
+    function closeCnCatalog() {
+      document.getElementById("cnCatalogModal").classList.remove("open");
+      document.removeEventListener("keydown", handleCnCatalogEsc);
+    }
+
+    function handleCnCatalogEsc(e) {
+      if (e.key === "Escape") closeCnCatalog();
+    }
+
+    // =====================================================================
     // INTERFAZ
     // =====================================================================
 
@@ -1229,6 +1524,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       document.getElementById("calculate").addEventListener("click", onCalculate);
       document.getElementById("downloadExcel").addEventListener("click", downloadExcel);
       document.getElementById("downloadPdf").addEventListener("click", () => window.print());
+
+      // Catálogo CN
+      document.getElementById("openCnCatalog").addEventListener("click", openCnCatalog);
+      document.getElementById("cnCatalogClose").addEventListener("click", closeCnCatalog);
+      document.getElementById("cnCatalogModal").addEventListener("click", (e) => {
+        if (e.target.id === "cnCatalogModal") closeCnCatalog();  // clic fuera del contenido
+      });
 
       // Calculadora de Tc
       document.getElementById("toggleTcCalc").addEventListener("click", toggleTcCalculator);
