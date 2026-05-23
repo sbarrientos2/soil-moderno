@@ -499,6 +499,113 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       100% { background: white; }
     }
     .tc-applied { animation: tc-flash 1.2s ease-out; }
+
+    /* ===== Estilos para impresión / Guardar como PDF ===== */
+    @media print {
+      @page { margin: 1.5cm; size: letter; }
+
+      body {
+        background: white;
+        color: #1a2332;
+        font-size: 10.5pt;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      header {
+        padding: 14px 20px;
+        box-shadow: none;
+        page-break-after: avoid;
+      }
+      header h1 { font-size: 16pt; }
+      header h2 { font-size: 11pt; }
+      header .credit { font-size: 9pt; }
+
+      main { padding: 0; max-width: none; }
+      section {
+        padding: 10px 0;
+        margin-bottom: 10px;
+        box-shadow: none;
+        border-radius: 0;
+        break-inside: auto;
+      }
+      section h3 {
+        page-break-after: avoid;
+        break-after: avoid;
+        margin-top: 14px;
+        font-size: 11pt;
+      }
+
+      /* Ocultar controles interactivos — sólo deben imprimirse los datos */
+      .tc-toggle-btn,
+      #tcCalcContainer,
+      button.primary,
+      .actions,
+      #errorBox,
+      .dll-preview {
+        display: none !important;
+      }
+
+      /* Aplanar inputs para que parezcan texto estático en el reporte */
+      input[type="text"],
+      input[type="number"],
+      select {
+        border: none !important;
+        background: transparent !important;
+        padding: 2px 0 !important;
+        margin-top: 2px !important;
+        box-shadow: none !important;
+        font-weight: 600;
+        color: #1a2332;
+        appearance: none;
+        -webkit-appearance: none;
+      }
+      .input-with-unit {
+        border: none;
+        background: transparent;
+      }
+      .input-with-unit input { padding: 2px 0 !important; }
+      .input-with-unit select {
+        background: transparent !important;
+        border-left: none !important;
+        width: auto;
+        font-weight: 500;
+        color: #4a5568;
+        padding-left: 6px !important;
+      }
+      /* Casillas "Incluir" no aportan nada en el reporte */
+      .tr-table input[type="checkbox"] { display: none; }
+
+      /* Gráfica del hidrograma — tamaño adecuado para impresión */
+      .chart-container {
+        height: 320px !important;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+
+      /* CLAVE: tabla detallada sin clipping para que se impriman TODAS las filas */
+      .detail-table-wrapper {
+        max-height: none !important;
+        overflow: visible !important;
+        border: none !important;
+      }
+      .detail-table-wrapper table { font-size: 8.5pt; }
+      /* Repetir encabezados de tabla en cada página */
+      thead { display: table-header-group; }
+      tbody tr {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      .detail-table-wrapper th {
+        position: static;  /* anula sticky para que se repita el header */
+      }
+
+      /* Tarjetas de parámetros */
+      .param-card {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+    }
   </style>
 </head>
 <body>
@@ -590,6 +697,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
       <div class="actions">
         <button class="secondary" id="downloadExcel">Descargar Excel</button>
+        <button class="secondary" id="downloadPdf" style="background:#805ad5;">Guardar como PDF</button>
       </div>
     </section>
   </main>
@@ -1120,6 +1228,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
       document.getElementById("calculate").addEventListener("click", onCalculate);
       document.getElementById("downloadExcel").addEventListener("click", downloadExcel);
+      document.getElementById("downloadPdf").addEventListener("click", () => window.print());
 
       // Calculadora de Tc
       document.getElementById("toggleTcCalc").addEventListener("click", toggleTcCalculator);
