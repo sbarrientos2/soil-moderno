@@ -39,7 +39,10 @@ Useful anchors (`grep -n`):
 
 ## Verification
 
-**No automated tests.** Verify changes manually by opening the HTML in a browser:
+**Automated tests cover the math core only.** Run `node tests/run.js` from the repo root — it extracts the code between `TEST-CORE-START`/`END` sentinels in `SOIL_moderno.html`, evaluates it in a Node `vm` sandbox, and runs property-based assertions on `computeHydrograph`, `interpolate`, `TC_FORMULAS`, and `CN_CATALOG`. No dependencies, no `package.json`. Don't fabricate "expected" numbers — the tests check mathematical invariants (caudal ≥ 0, PE ≤ PM, higher CN → higher Qmax, etc.). When you have values validated by the domain expert, add them to the `REFERENCE_CASES` array at the bottom of `tests/run.js`.
+
+**UI/chart/Excel/print still need manual browser verification:**
 1. Fill in the form, hit *Calcular Hidrograma* — chart and tables should render.
 2. Hit *Descargar Excel* — open the file, confirm the chart image and detail table look right.
 3. Hit *Guardar como PDF* (or Ctrl/Cmd+P) — in the print preview, confirm the *Tabla detallada* shows **all** rows (not a truncated screenshot) and column headers repeat across pages.
+4. If editing dual-CN mode: also tick *Comparar con condición futura*, repeat the above with two CNs.

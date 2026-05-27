@@ -309,6 +309,33 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       transition: background 0.15s;
     }
     .tc-toggle-btn:hover { background: #ebf4ff; }
+    .dual-cn-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      font-size: 11px;
+      color: #4a5568;
+      cursor: pointer;
+      user-select: none;
+    }
+    .dual-cn-toggle input[type="checkbox"] {
+      margin: 0;
+      width: auto;
+      cursor: pointer;
+    }
+    .dual-cn-toggle span { cursor: pointer; }
+    .cn-future-label .cn-future-tag {
+      display: inline-block;
+      background: #805ad5;
+      color: white;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 3px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
     .tc-calc {
       background: #f7fafc;
       border: 1px solid #e2e8f0;
@@ -738,6 +765,17 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         page-break-inside: avoid;
         break-inside: avoid;
       }
+
+      /* Modo dual-CN: tablas duplican columnas (resumen pasa de 5 a 8,
+         detalle pasa de N+1 a 2N+1). Reducimos un punto el tamaño de
+         fuente para que quepan en hoja carta. Se recomienda imprimir
+         en horizontal cuando hay muchos períodos de retorno. */
+      body.dual-mode #summaryTable { font-size: 9pt; }
+      body.dual-mode .detail-table-wrapper table { font-size: 7.5pt; }
+      body.dual-mode #summaryTable th,
+      body.dual-mode #summaryTable td,
+      body.dual-mode #detailTable th,
+      body.dual-mode #detailTable td { padding: 4px 6px; }
     }
   </style>
 </head>
@@ -770,7 +808,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         </label>
         <label>CN (número de escurrimiento)
           <input type="number" id="cn" step="any" placeholder="Ej: 75">
-          <button type="button" class="tc-toggle-btn" id="openCnCatalog">📖 Elegir CN desde catálogo de uso del suelo</button>
+          <button type="button" class="tc-toggle-btn" id="openCnCatalog" data-cn-target="cn">📖 Elegir CN desde catálogo de uso del suelo</button>
+          <div class="dual-cn-toggle">
+            <input type="checkbox" id="enableDualCn">
+            <span>Comparar con condición futura</span>
+          </div>
+        </label>
+        <label id="cnFutureLabel" class="cn-future-label" style="display:none;">CN futuro <span class="cn-future-tag">FUTURO</span>
+          <input type="number" id="cn2" step="any" placeholder="Ej: 85">
+          <button type="button" class="tc-toggle-btn" id="openCnCatalog2" data-cn-target="cn2">📖 Elegir CN desde catálogo de uso del suelo</button>
         </label>
         <label>Tiempo de concentración (hrs)
           <input type="number" id="tc" step="any" placeholder="Ej: 1.2">
@@ -880,6 +926,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     // =====================================================================
     // DATOS EMBEBIDOS
     // =====================================================================
+
+    // ============================ TEST-CORE-START ============================
+    // El contenido entre TEST-CORE-START/END es código puro (sin acceso al
+    // DOM) que el corredor de pruebas en tests/run.js extrae y evalúa en
+    // un sandbox de Node. Si agregas funciones que dependan de DOM/Chart.js,
+    // ponlas FUERA de esta región.
 
     // Hidrograma adimensional SCS (SOIL.HAD)
     const SOIL_HAD = [
@@ -1162,6 +1214,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       return { PE, PM, TP, QP, TD, SZ, times, flows, Qmax, Vol };
     }
 
+    // ============================= TEST-CORE-END =============================
+
     // =====================================================================
     // CALCULADORA DE TIEMPO DE CONCENTRACIÓN (TCCALC modernizado)
     // =====================================================================
@@ -1375,6 +1429,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     // en Aparicio Mijares "Fundamentos de Hidrología de Superficie".
     // Aplican para condición de humedad antecedente AMC II.
     // =====================================================================
+    // ============================ TEST-CORE-START ============================
     const CN_CATALOG = [
       // --- Cultivos agrícolas ---
       { group: "Cultivos agrícolas", name: "Cultivos en hilera (caña de azúcar, maíz, soya, banano, algodón)", condition: "Hilera recta, sin prácticas de conservación, condición pobre", values: [72, 81, 88, 91] },
@@ -1423,6 +1478,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       { group: "Superficies pavimentadas y otras", name: "Techos, parqueaderos y plazas pavimentadas", condition: "Totalmente impermeable", values: [98, 98, 98, 98] },
       { group: "Superficies pavimentadas y otras", name: "Áreas en desarrollo (movimiento de tierra reciente)", condition: "Sin vegetación establecida", values: [77, 86, 91, 94] },
     ];
+    // ============================= TEST-CORE-END =============================
 
     function buildCnCatalogHtml() {
       let html = "";
@@ -1453,8 +1509,13 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       return html;
     }
 
+    // Cuál input recibe el valor cuando se elige una celda del catálogo:
+    // "cn" (condición actual) o "cn2" (condición futura).
+    let activeCnTarget = "cn";
+
     function applyCnValue(cn) {
-      const cnInput = document.getElementById("cn");
+      const cnInput = document.getElementById(activeCnTarget);
+      if (!cnInput) return;
       cnInput.value = cn;
       // Reutilizamos la animación tc-flash para feedback visual
       cnInput.classList.remove("tc-applied");
@@ -1462,7 +1523,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       cnInput.classList.add("tc-applied");
     }
 
-    function openCnCatalog() {
+    function openCnCatalog(targetId) {
+      activeCnTarget = targetId || "cn";
       const overlay = document.getElementById("cnCatalogModal");
       const tbody = document.getElementById("cnCatalogBody");
       if (tbody.children.length === 0) {
@@ -1525,11 +1587,25 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       document.getElementById("downloadExcel").addEventListener("click", downloadExcel);
       document.getElementById("downloadPdf").addEventListener("click", () => window.print());
 
-      // Catálogo CN
-      document.getElementById("openCnCatalog").addEventListener("click", openCnCatalog);
+      // Catálogo CN — ambos botones (actual y futuro) usan data-cn-target
+      document.querySelectorAll("[id^='openCnCatalog']").forEach(btn => {
+        btn.addEventListener("click", () => openCnCatalog(btn.dataset.cnTarget));
+      });
       document.getElementById("cnCatalogClose").addEventListener("click", closeCnCatalog);
       document.getElementById("cnCatalogModal").addEventListener("click", (e) => {
         if (e.target.id === "cnCatalogModal") closeCnCatalog();  // clic fuera del contenido
+      });
+
+      // Toggle de condición futura (modo dual-CN)
+      const dualCnCb = document.getElementById("enableDualCn");
+      const dualCnDiv = dualCnCb.closest(".dual-cn-toggle");
+      const cnFutureLabel = document.getElementById("cnFutureLabel");
+      dualCnDiv.querySelector("span").addEventListener("click", () => {
+        dualCnCb.checked = !dualCnCb.checked;
+        dualCnCb.dispatchEvent(new Event("change"));
+      });
+      dualCnCb.addEventListener("change", () => {
+        cnFutureLabel.style.display = dualCnCb.checked ? "flex" : "none";
       });
 
       // Calculadora de Tc
@@ -1585,6 +1661,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       const areaRaw = num("area");
       const areaUnit = document.getElementById("areaUnit").value;
       const areaKm2 = areaUnit === "ha" ? areaRaw / 100 : areaRaw;
+      const dualMode = document.getElementById("enableDualCn").checked;
       return {
         rio: get("rio"),
         sitio: get("sitio"),
@@ -1593,6 +1670,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         areaRaw,
         areaUnit,
         CN: num("cn"),
+        CN2: dualMode ? num("cn2") : null,
+        dualMode,
         Tc: num("tc"),
         rainMax: num("rainMax"),
         FRR: num("frr"),
@@ -1613,6 +1692,9 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       if (!inputs.sitio) return "Falta nombre del sitio.";
       if (isNaN(inputs.area) || inputs.area <= 0) return "Área inválida.";
       if (isNaN(inputs.CN) || inputs.CN <= 0 || inputs.CN > 100) return "CN debe estar entre 1 y 100.";
+      if (inputs.dualMode) {
+        if (isNaN(inputs.CN2) || inputs.CN2 <= 0 || inputs.CN2 > 100) return "CN futuro debe estar entre 1 y 100.";
+      }
       if (isNaN(inputs.Tc) || inputs.Tc <= 0) return "Tiempo de concentración inválido.";
       if (isNaN(inputs.rainMax) || inputs.rainMax <= 0) return "Duración máx. de lluvia inválida.";
       if (isNaN(inputs.FRR) || isNaN(inputs.FSS)) return "Factores de reducción inválidos.";
@@ -1630,19 +1712,24 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       if (err) { showError(err); return; }
 
       const rainDist = RAINFALL_DISTS[inputs.dllName];
+      const baseArgs = {
+        area: inputs.area,
+        Tc: inputs.Tc,
+        rainMax: inputs.rainMax,
+        FRR: inputs.FRR,
+        FSS: inputs.FSS,
+        unitHydro: SOIL_HAD,
+        rainDist,
+      };
       const results = inputs.returnPeriods.map(rp => {
-        const r = computeHydrograph({
-          area: inputs.area,
-          CN: inputs.CN,
-          Tc: inputs.Tc,
-          rainMax: inputs.rainMax,
-          FRR: inputs.FRR,
-          FSS: inputs.FSS,
-          Pmax: rp.pp,
-          unitHydro: SOIL_HAD,
-          rainDist
-        });
-        return { tr: rp.tr, pp: rp.pp, ...r };
+        const actual = computeHydrograph({ ...baseArgs, CN: inputs.CN, Pmax: rp.pp });
+        // Los campos PE/SZ/flows/Qmax/Vol del nivel superior reflejan la
+        // condición actual — mantiene compatibilidad con el modo de un solo CN.
+        const row = { tr: rp.tr, pp: rp.pp, ...actual };
+        if (inputs.dualMode) {
+          row.future = computeHydrograph({ ...baseArgs, CN: inputs.CN2, Pmax: rp.pp });
+        }
+        return row;
       });
 
       lastResults = results;
@@ -1652,45 +1739,111 @@ https://github.com/nodeca/pako/blob/main/LICENSE
 
     function renderResults(inputs, results) {
       document.getElementById("results").classList.add("visible");
+      const dual = inputs.dualMode;
+      // El bloque @media print usa esta clase para encoger un poco las
+      // tablas — con CN actual + futuro las columnas se duplican.
+      document.body.classList.toggle("dual-mode", dual);
 
-      // Parámetros calculados (iguales para todos los TR)
+      // Parámetros calculados — TD, TP, QP son idénticos entre actual y futuro
+      // (sólo dependen de Tc y área). S depende de CN, así que se muestra
+      // separada por condición en modo dual.
       const r0 = results[0];
       const paramsGrid = document.getElementById("paramsGrid");
+      const sCard = dual
+        ? `<div class="param-card">
+             <div class="label">Retención máx. (S)</div>
+             <div class="value">${r0.SZ.toFixed(3)} <span class="unit">pulg. (actual)</span></div>
+             <div class="value" style="margin-top:4px;">${r0.future.SZ.toFixed(3)} <span class="unit">pulg. (futuro)</span></div>
+           </div>`
+        : `<div class="param-card"><div class="label">Retención máx. (S)</div><div class="value">${r0.SZ.toFixed(3)} <span class="unit">pulg.</span></div></div>`;
       paramsGrid.innerHTML = `
-        <div class="param-card"><div class="label">Retención máx. (S)</div><div class="value">${r0.SZ.toFixed(3)} <span class="unit">pulg.</span></div></div>
+        ${sCard}
         <div class="param-card"><div class="label">Intervalo (TD)</div><div class="value">${(r0.TD * 60).toFixed(1)} <span class="unit">min</span></div></div>
         <div class="param-card"><div class="label">Tiempo pico (TP)</div><div class="value">${r0.TP.toFixed(3)} <span class="unit">hrs</span></div></div>
-        <div class="param-card"><div class="label">Caudal pico unit. (QP)</div><div class="value">${r0.QP.toFixed(2)} <span class="unit">m³/s</span></div></div>
+        <div class="param-card"><div class="label">Caudal pico unit. (QP)</div><div class="value">${r0.QP.toFixed(3)} <span class="unit">m³/s</span></div></div>
       `;
 
-      // Tabla resumen
+      // Tabla resumen — encabezados dinámicos según modo
+      const summaryHead = document.querySelector("#summaryTable thead");
+      if (dual) {
+        summaryHead.innerHTML = `
+          <tr>
+            <th>TR (años)</th>
+            <th>Precip. total (mm)</th>
+            <th>Precip. efectiva act. (mm)</th>
+            <th>Precip. efectiva fut. (mm)</th>
+            <th>Caudal máx. act. (m³/s)</th>
+            <th>Caudal máx. fut. (m³/s)</th>
+            <th>Volumen act. (m³)</th>
+            <th>Volumen fut. (m³)</th>
+          </tr>`;
+      } else {
+        summaryHead.innerHTML = `
+          <tr>
+            <th>TR (años)</th>
+            <th>Precip. total (mm)</th>
+            <th>Precip. efectiva (mm)</th>
+            <th>Caudal máx. (m³/s)</th>
+            <th>Volumen (m³)</th>
+          </tr>`;
+      }
+      const fmtVol = v => v.toLocaleString("es-CO", { maximumFractionDigits: 0 });
       const summaryBody = document.querySelector("#summaryTable tbody");
-      summaryBody.innerHTML = results.map(r => `
+      summaryBody.innerHTML = results.map(r => dual ? `
         <tr>
           <td>${r.tr}</td>
           <td>${r.PM.toFixed(2)}</td>
           <td>${r.PE.toFixed(2)}</td>
-          <td><strong>${r.Qmax.toFixed(2)}</strong></td>
-          <td>${r.Vol.toLocaleString("es-CO", {maximumFractionDigits: 0})}</td>
+          <td>${r.future.PE.toFixed(2)}</td>
+          <td><strong>${r.Qmax.toFixed(3)}</strong></td>
+          <td><strong>${r.future.Qmax.toFixed(3)}</strong></td>
+          <td>${fmtVol(r.Vol)}</td>
+          <td>${fmtVol(r.future.Vol)}</td>
+        </tr>
+      ` : `
+        <tr>
+          <td>${r.tr}</td>
+          <td>${r.PM.toFixed(2)}</td>
+          <td>${r.PE.toFixed(2)}</td>
+          <td><strong>${r.Qmax.toFixed(3)}</strong></td>
+          <td>${fmtVol(r.Vol)}</td>
         </tr>
       `).join("");
 
-      // Gráfica del hidrograma
+      // Gráfica del hidrograma — en modo dual, cada TR aporta dos curvas:
+      // sólida para la condición actual, discontinua para la condición futura,
+      // ambas con el mismo color base (un color por TR).
       const ctx = document.getElementById("hydrographChart").getContext("2d");
       if (hydrographChart) hydrographChart.destroy();
-      hydrographChart = new Chart(ctx, {
-        type: "line",
-        data: {
-          datasets: results.map((r, i) => ({
-            label: `TR = ${r.tr} años`,
-            data: r.times.map((t, idx) => ({ x: t, y: r.flows[idx] })),
-            borderColor: TR_COLORS[i % TR_COLORS.length],
-            backgroundColor: TR_COLORS[i % TR_COLORS.length] + "20",
+      const datasets = [];
+      results.forEach((r, i) => {
+        const color = TR_COLORS[i % TR_COLORS.length];
+        const baseLabel = `TR = ${r.tr} años`;
+        datasets.push({
+          label: dual ? `${baseLabel} (actual)` : baseLabel,
+          data: r.times.map((t, idx) => ({ x: t, y: r.flows[idx] })),
+          borderColor: color,
+          backgroundColor: color + "20",
+          tension: 0.25,
+          pointRadius: 0,
+          borderWidth: 2,
+        });
+        if (dual) {
+          datasets.push({
+            label: `${baseLabel} (futuro)`,
+            data: r.times.map((t, idx) => ({ x: t, y: r.future.flows[idx] })),
+            borderColor: color,
+            backgroundColor: color + "20",
+            borderDash: [6, 4],
             tension: 0.25,
             pointRadius: 0,
             borderWidth: 2,
-          }))
-        },
+          });
+        }
+      });
+      hydrographChart = new Chart(ctx, {
+        type: "line",
+        data: { datasets },
         options: {
           responsive: true,
           maintainAspectRatio: false,
@@ -1700,7 +1853,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
             tooltip: {
               callbacks: {
                 title: items => `t = ${items[0].parsed.x.toFixed(2)} hrs`,
-                label: item => `${item.dataset.label}: ${item.parsed.y.toFixed(2)} m³/s`
+                label: item => `${item.dataset.label}: ${item.parsed.y.toFixed(3)} m³/s`
               }
             }
           },
@@ -1711,17 +1864,26 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         }
       });
 
-      // Tabla detallada (todos los TRs en columnas)
+      // Tabla detallada — en modo dual cada TR genera dos columnas (act./fut.)
       const maxLen = Math.max(...results.map(r => r.times.length));
       const detailHead = document.querySelector("#detailTable thead");
       const detailBody = document.querySelector("#detailTable tbody");
-      detailHead.innerHTML = `<tr><th>t (hrs)</th>${results.map(r => `<th>Q TR=${r.tr}</th>`).join("")}</tr>`;
+      const headCells = results.map(r => dual
+        ? `<th>Q TR=${r.tr} act.</th><th>Q TR=${r.tr} fut.</th>`
+        : `<th>Q TR=${r.tr}</th>`
+      ).join("");
+      detailHead.innerHTML = `<tr><th>t (hrs)</th>${headCells}</tr>`;
       let rowsHtml = "";
       for (let i = 0; i < maxLen; i++) {
         const t = results[0].times[i];
         const tStr = t !== undefined ? t.toFixed(3) : "";
-        const flows = results.map(r => r.flows[i] !== undefined ? r.flows[i].toFixed(2) : "").join("</td><td>");
-        rowsHtml += `<tr><td>${tStr}</td><td>${flows}</td></tr>`;
+        const cells = results.map(r => {
+          const a = r.flows[i] !== undefined ? r.flows[i].toFixed(3) : "";
+          if (!dual) return `<td>${a}</td>`;
+          const f = r.future.flows[i] !== undefined ? r.future.flows[i].toFixed(3) : "";
+          return `<td>${a}</td><td>${f}</td>`;
+        }).join("");
+        rowsHtml += `<tr><td>${tStr}</td>${cells}</tr>`;
       }
       detailBody.innerHTML = rowsHtml;
 
@@ -1807,25 +1969,33 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       };
 
       // ===== Hoja 1: Resumen =====
+      // En modo dual la tabla ocupa A:H (8 columnas) en lugar de A:E (5),
+      // así que las celdas combinadas, el ancho de columnas y la posición
+      // de la imagen del gráfico se calculan dinámicamente.
+      const dualXls = lastInputs.dualMode;
+      const nDataCols = dualXls ? 8 : 5;
+      const lastCol = String.fromCharCode(64 + nDataCols);     // "E" o "H"
+      const gapCol = nDataCols + 1;                            // 6 o 9
       const ws = wb.addWorksheet("Resumen", {
         views: [{ showGridLines: false }],
       });
       ws.columns = [
-        { width: 38 }, { width: 22 }, { width: 22 }, { width: 22 }, { width: 22 },
+        { width: 38 },
+        ...Array.from({ length: nDataCols - 1 }, () => ({ width: 22 })),
         { width: 3 },  // gap antes de la gráfica
       ];
 
       let r = 1;
 
       // Título
-      ws.mergeCells(`A${r}:E${r}`);
+      ws.mergeCells(`A${r}:${lastCol}${r}`);
       apply(ws.getCell(`A${r}`), titleStyle);
       ws.getCell(`A${r}`).value = "CÁLCULO DE HIDROGRAMA DE ESCURRIMIENTO – MÉTODO SCS";
       ws.getRow(r).height = 26;
       r += 2;
 
       // --- Información del proyecto ---
-      ws.mergeCells(`A${r}:E${r}`);
+      ws.mergeCells(`A${r}:${lastCol}${r}`);
       apply(ws.getCell(`A${r}`), sectionStyle);
       ws.getCell(`A${r}`).value = "INFORMACIÓN DEL PROYECTO";
       ws.getRow(r).height = 20;
@@ -1839,15 +2009,15 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       ];
       for (const [k, v] of projectRows) {
         apply(ws.getCell(`A${r}`), labelStyle); ws.getCell(`A${r}`).value = k;
-        ws.mergeCells(`B${r}:E${r}`);
-        applyRange(ws, `B${r}:E${r}`, valueStyle);
+        ws.mergeCells(`B${r}:${lastCol}${r}`);
+        applyRange(ws, `B${r}:${lastCol}${r}`, valueStyle);
         ws.getCell(`B${r}`).value = v;
         r++;
       }
       r++;
 
       // --- Parámetros de entrada ---
-      ws.mergeCells(`A${r}:E${r}`);
+      ws.mergeCells(`A${r}:${lastCol}${r}`);
       apply(ws.getCell(`A${r}`), sectionStyle);
       ws.getCell(`A${r}`).value = "PARÁMETROS DE ENTRADA";
       ws.getRow(r).height = 20;
@@ -1855,7 +2025,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       const areaUnitLabel = lastInputs.areaUnit === "ha" ? "hectáreas" : "km²";
       const inputRows = [
         ["Área", lastInputs.areaRaw, areaUnitLabel],
-        ["CN (número de escurrimiento)", lastInputs.CN, ""],
+        [dualXls ? "CN actual" : "CN (número de escurrimiento)", lastInputs.CN, ""],
+        ...(dualXls ? [["CN futuro", lastInputs.CN2, ""]] : []),
         ["Tiempo de concentración", lastInputs.Tc, "hrs"],
         ["Duración máxima de lluvia", lastInputs.rainMax, "hrs"],
         ["Factor de reducción por duración", lastInputs.FRR, ""],
@@ -1864,20 +2035,27 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       for (const [k, v, u] of inputRows) {
         apply(ws.getCell(`A${r}`), labelStyle); ws.getCell(`A${r}`).value = k;
         apply(ws.getCell(`B${r}`), { ...numStyle, numFmt: "0.####" }); ws.getCell(`B${r}`).value = v;
-        ws.mergeCells(`C${r}:E${r}`);
-        applyRange(ws, `C${r}:E${r}`, valueStyle);
+        ws.mergeCells(`C${r}:${lastCol}${r}`);
+        applyRange(ws, `C${r}:${lastCol}${r}`, valueStyle);
         ws.getCell(`C${r}`).value = u;
         r++;
       }
       r++;
 
       // --- Parámetros calculados ---
-      ws.mergeCells(`A${r}:E${r}`);
+      ws.mergeCells(`A${r}:${lastCol}${r}`);
       apply(ws.getCell(`A${r}`), sectionStyle);
       ws.getCell(`A${r}`).value = "PARÁMETROS CALCULADOS";
       ws.getRow(r).height = 20;
       r++;
-      const calcRows = [
+      // S depende de CN, por lo que en modo dual se muestran ambas filas.
+      const calcRows = dualXls ? [
+        ["Retención potencial máxima (S) — actual", lastResults[0].SZ, "pulg."],
+        ["Retención potencial máxima (S) — futuro", lastResults[0].future.SZ, "pulg."],
+        ["Intervalo de cálculo (TD)", lastResults[0].TD, "hrs"],
+        ["Tiempo pico unitario (TP)", lastResults[0].TP, "hrs"],
+        ["Caudal pico unitario (QP)", lastResults[0].QP, "m³/s"],
+      ] : [
         ["Retención potencial máxima (S)", lastResults[0].SZ, "pulg."],
         ["Intervalo de cálculo (TD)", lastResults[0].TD, "hrs"],
         ["Tiempo pico unitario (TP)", lastResults[0].TP, "hrs"],
@@ -1886,20 +2064,23 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       for (const [k, v, u] of calcRows) {
         apply(ws.getCell(`A${r}`), labelStyle); ws.getCell(`A${r}`).value = k;
         apply(ws.getCell(`B${r}`), numStyle); ws.getCell(`B${r}`).value = v;
-        ws.mergeCells(`C${r}:E${r}`);
-        applyRange(ws, `C${r}:E${r}`, valueStyle);
+        ws.mergeCells(`C${r}:${lastCol}${r}`);
+        applyRange(ws, `C${r}:${lastCol}${r}`, valueStyle);
         ws.getCell(`C${r}`).value = u;
         r++;
       }
       r++;
 
       // --- Resumen por período de retorno ---
-      ws.mergeCells(`A${r}:E${r}`);
+      ws.mergeCells(`A${r}:${lastCol}${r}`);
       apply(ws.getCell(`A${r}`), sectionStyle);
       ws.getCell(`A${r}`).value = "RESUMEN POR PERÍODO DE RETORNO";
       ws.getRow(r).height = 20;
       r++;
-      const headers = ["TR (años)", "Precip. total (mm)", "Precip. efectiva (mm)", "Caudal máx. (m³/s)", "Volumen (m³)"];
+      const headers = dualXls
+        ? ["TR (años)", "Precip. total (mm)", "Precip. efect. act. (mm)", "Precip. efect. fut. (mm)",
+           "Caudal máx. act. (m³/s)", "Caudal máx. fut. (m³/s)", "Volumen act. (m³)", "Volumen fut. (m³)"]
+        : ["TR (años)", "Precip. total (mm)", "Precip. efectiva (mm)", "Caudal máx. (m³/s)", "Volumen (m³)"];
       headers.forEach((h, i) => {
         const cell = ws.getCell(r, i + 1);
         apply(cell, headerStyle);
@@ -1907,14 +2088,22 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       });
       ws.getRow(r).height = 22;
       r++;
+      const boldNum = { ...dataNumStyle, font: { ...dataNumStyle.font, bold: true } };
+      const volStyle = { ...dataNumStyle, numFmt: "#,##0" };
       for (const res of lastResults) {
-        apply(ws.getCell(r, 1), dataIntStyle);     ws.getCell(r, 1).value = res.tr;
-        apply(ws.getCell(r, 2), dataNumStyle);     ws.getCell(r, 2).value = res.PM;
-        apply(ws.getCell(r, 3), dataNumStyle);     ws.getCell(r, 3).value = res.PE;
-        apply(ws.getCell(r, 4), { ...dataNumStyle, font: { ...dataNumStyle.font, bold: true } });
-        ws.getCell(r, 4).value = res.Qmax;
-        apply(ws.getCell(r, 5), { ...dataNumStyle, numFmt: "#,##0" });
-        ws.getCell(r, 5).value = res.Vol;
+        apply(ws.getCell(r, 1), dataIntStyle); ws.getCell(r, 1).value = res.tr;
+        apply(ws.getCell(r, 2), dataNumStyle); ws.getCell(r, 2).value = res.PM;
+        apply(ws.getCell(r, 3), dataNumStyle); ws.getCell(r, 3).value = res.PE;
+        if (dualXls) {
+          apply(ws.getCell(r, 4), dataNumStyle); ws.getCell(r, 4).value = res.future.PE;
+          apply(ws.getCell(r, 5), boldNum);      ws.getCell(r, 5).value = res.Qmax;
+          apply(ws.getCell(r, 6), boldNum);      ws.getCell(r, 6).value = res.future.Qmax;
+          apply(ws.getCell(r, 7), volStyle);     ws.getCell(r, 7).value = res.Vol;
+          apply(ws.getCell(r, 8), volStyle);     ws.getCell(r, 8).value = res.future.Vol;
+        } else {
+          apply(ws.getCell(r, 4), boldNum);  ws.getCell(r, 4).value = res.Qmax;
+          apply(ws.getCell(r, 5), volStyle); ws.getCell(r, 5).value = res.Vol;
+        }
         r++;
       }
 
@@ -1925,24 +2114,28 @@ https://github.com/nodeca/pako/blob/main/LICENSE
         const base64 = dataUrl.split(",")[1];
         const imgId = wb.addImage({ base64, extension: "png" });
         ws.addImage(imgId, {
-          tl: { col: 6, row: 1 },
+          tl: { col: gapCol, row: 1 },
           ext: { width: 720, height: 480 },
           editAs: "oneCell",
         });
       }
 
       // ===== Hoja 2: Hidrograma detallado =====
+      // En modo dual, cada TR genera dos columnas de caudal (actual/futuro).
+      const flowsPerTr = dualXls ? 2 : 1;
       const ws2 = wb.addWorksheet("Hidrograma", {
         views: [{ showGridLines: false, state: "frozen", ySplit: 2 }],
       });
       ws2.columns = [
         { width: 12 },
-        ...lastResults.map(() => ({ width: 16 })),
+        ...lastResults.flatMap(() => Array.from({ length: flowsPerTr }, () => ({ width: 16 }))),
       ];
 
       // Título
-      const ncols = 1 + lastResults.length;
-      const lastColLetter = String.fromCharCode(64 + ncols);
+      const ncols = 1 + lastResults.length * flowsPerTr;
+      const lastColLetter = ncols <= 26
+        ? String.fromCharCode(64 + ncols)
+        : String.fromCharCode(64 + Math.floor((ncols - 1) / 26)) + String.fromCharCode(65 + ((ncols - 1) % 26));
       ws2.mergeCells(`A1:${lastColLetter}1`);
       apply(ws2.getCell("A1"), titleStyle);
       ws2.getCell("A1").value = "HIDROGRAMA DETALLADO – CAUDAL (m³/s) vs. TIEMPO (hrs)";
@@ -1952,8 +2145,16 @@ https://github.com/nodeca/pako/blob/main/LICENSE
       apply(ws2.getCell(2, 1), headerStyle);
       ws2.getCell(2, 1).value = "t (hrs)";
       lastResults.forEach((res, i) => {
-        apply(ws2.getCell(2, i + 2), headerStyle);
-        ws2.getCell(2, i + 2).value = `Q TR=${res.tr} (m³/s)`;
+        const baseCol = 2 + i * flowsPerTr;
+        if (dualXls) {
+          apply(ws2.getCell(2, baseCol),     headerStyle);
+          ws2.getCell(2, baseCol).value     = `Q TR=${res.tr} act. (m³/s)`;
+          apply(ws2.getCell(2, baseCol + 1), headerStyle);
+          ws2.getCell(2, baseCol + 1).value = `Q TR=${res.tr} fut. (m³/s)`;
+        } else {
+          apply(ws2.getCell(2, baseCol), headerStyle);
+          ws2.getCell(2, baseCol).value = `Q TR=${res.tr} (m³/s)`;
+        }
       });
       ws2.getRow(2).height = 22;
 
@@ -1967,10 +2168,18 @@ https://github.com/nodeca/pako/blob/main/LICENSE
           ws2.getCell(rowIdx, 1).value = t;
         }
         lastResults.forEach((res, j) => {
+          const baseCol = 2 + j * flowsPerTr;
           const v = res.flows[i];
           if (v !== undefined) {
-            apply(ws2.getCell(rowIdx, j + 2), dataNumStyle);
-            ws2.getCell(rowIdx, j + 2).value = v;
+            apply(ws2.getCell(rowIdx, baseCol), dataNumStyle);
+            ws2.getCell(rowIdx, baseCol).value = v;
+          }
+          if (dualXls) {
+            const vf = res.future.flows[i];
+            if (vf !== undefined) {
+              apply(ws2.getCell(rowIdx, baseCol + 1), dataNumStyle);
+              ws2.getCell(rowIdx, baseCol + 1).value = vf;
+            }
           }
         });
       }
